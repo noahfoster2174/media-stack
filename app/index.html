@@ -950,6 +950,410 @@
     border-radius: 3px;
   }
   main::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
+
+  /* ===== Library tab ===== */
+  .library-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .library-actions button {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .library-actions button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+
+  .library-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .library-actions .spin {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--text-3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .library-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .library-card {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    animation: cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .library-card:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+  }
+
+  .library-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .library-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+  }
+
+  .library-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .library-status {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-xs);
+    line-height: 1.2;
+  }
+
+  .library-status.watched {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  .library-status.unwatched {
+    background: var(--surface-2);
+    color: var(--text-3);
+  }
+
+  .stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .stars svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .stars .filled { color: var(--amber); }
+  .stars .empty { color: var(--text-3); opacity: 0.3; }
+
+  .library-review-excerpt {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: auto;
+  }
+
+  /* ===== Review modal ===== */
+  .review-form {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .star-picker {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .star-picker svg {
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    color: var(--text-3);
+    opacity: 0.3;
+    transition: color 0.1s, opacity 0.1s, transform 0.1s;
+  }
+
+  .star-picker svg:hover { transform: scale(1.15); }
+  .star-picker svg.active { color: var(--amber); opacity: 1; }
+
+  .review-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .review-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .review-textarea::placeholder { color: var(--text-3); }
+
+  .review-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-save {
+    padding: 8px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s;
+    margin-left: auto;
+  }
+
+  .btn-save:hover { background: var(--accent-hover); }
+  .btn-save:disabled { opacity: 0.5; cursor: default; }
+
+  .btn-notion {
+    padding: 8px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn-notion:hover { background: var(--surface-hover); color: var(--text); }
+  .btn-notion:disabled { opacity: 0.5; cursor: default; }
+  .btn-notion.pushed {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+    pointer-events: none;
+  }
+
+  .btn-remove-watched {
+    background: none;
+    border: none;
+    color: var(--text-3);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 8px 4px;
+    transition: color 0.12s;
+  }
+
+  .btn-remove-watched:hover { color: var(--red); }
+
+  /* ===== Explore tab ===== */
+  .explore-section {
+    margin-bottom: 28px;
+  }
+
+  .explore-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .explore-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+  }
+
+  .explore-row::-webkit-scrollbar { height: 4px; }
+  .explore-row::-webkit-scrollbar-track { background: transparent; }
+  .explore-row::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+  }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .explore-card {
+    width: 130px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: transform 0.15s, box-shadow 0.15s;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    animation: cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .explore-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-strong);
+  }
+
+  .explore-card.loading { opacity: 0.5; pointer-events: none; }
+  .explore-card.added { border-color: var(--green); }
+  .explore-card.in-library { opacity: 0.6; }
+  .explore-card.in-library:hover { transform: none; box-shadow: none; }
+
+  .in-library-badge {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .in-library-badge svg {
+    width: 12px;
+    height: 12px;
+    color: #fff;
+  }
+
+  .explore-card img {
+    width: 130px;
+    height: 195px;
+    object-fit: cover;
+    display: block;
+    background: var(--surface-2);
+  }
+
+  .explore-card-info {
+    padding: 8px;
+  }
+
+  .explore-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+  }
+
+  .explore-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+
+  .explore-card-rating {
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  .explore-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  .explore-header {
+    position: relative;
+  }
+
+  .explore-refresh {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+
+  .explore-refresh:hover {
+    background: var(--surface-hover, var(--surface-2));
+    color: var(--text-1);
+  }
+
+  .explore-refresh svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .explore-refresh.spinning svg {
+    animation: spin 0.6s ease;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -973,13 +1377,27 @@
     <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
   </symbol>
+  <symbol id="icon-star" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/>
+  </symbol>
+  <symbol id="icon-star-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/>
+  </symbol>
+  <symbol id="icon-library" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+  </symbol>
+  <symbol id="icon-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+  </symbol>
 </svg>
 
 <header>
   <div class="header-inner">
     <div class="app-title"><svg width="18" height="18" viewBox="0 0 64 64" style="vertical-align: -3px; margin-right: 7px;"><circle cx="32" cy="32" r="30" fill="#3b82f6"/><circle cx="32" cy="32" r="10" fill="#09090b"/><circle cx="32" cy="32" r="6" fill="#3b82f6"/><circle cx="32" cy="8" r="5" fill="#09090b"/><circle cx="32" cy="56" r="5" fill="#09090b"/><circle cx="8" cy="32" r="5" fill="#09090b"/><circle cx="56" cy="32" r="5" fill="#09090b"/><circle cx="14.6" cy="14.6" r="4.5" fill="#09090b"/><circle cx="49.4" cy="14.6" r="4.5" fill="#09090b"/><circle cx="14.6" cy="49.4" r="4.5" fill="#09090b"/><circle cx="49.4" cy="49.4" r="4.5" fill="#09090b"/></svg>Reelz</div>
     <div class="tabs">
-      <button class="tab active" id="tab-search" data-tab="search">Search</button>
+      <button class="tab active" id="tab-explore" data-tab="explore">Explore</button>
+      <button class="tab" id="tab-search" data-tab="search">Search</button>
+      <button class="tab" id="tab-library" data-tab="library">Library</button>
       <button class="tab" id="tab-downloads" data-tab="downloads">Downloads</button>
       <div class="tab-indicator" id="tab-indicator"></div>
     </div>
@@ -988,11 +1406,28 @@
 
 <main>
   <div id="health-banners"></div>
-  <section id="view-search" class="view active">
+  <section id="view-explore" class="view active">
+    <div class="explore-header">
+      <button class="explore-refresh" id="explore-refresh-btn" title="Refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+    </div>
+    <div id="explore-container"></div>
+    <div id="explore-empty" class="empty-state" style="display:none">
+      <svg class="empty-icon"><use href="#icon-compass"/></svg>
+      <p>Add TMDB_API_KEY to .env to enable Explore</p>
+      <p class="empty-sub">Get a free key at themoviedb.org</p>
+    </div>
+  </section>
+
+  <section id="view-search" class="view">
     <div class="search-bar">
       <div class="search-input-wrap">
         <svg class="search-icon"><use href="#icon-search"/></svg>
-        <input type="text" id="search-input" placeholder="Search movies..." autofocus>
+        <input type="text" id="search-input" placeholder="Search movies...">
         <span class="search-kbd">&#8984;K</span>
       </div>
       <button class="search-btn" id="search-btn">Search</button>
@@ -1003,6 +1438,19 @@
         <p>Search for a movie</p>
         <p class="empty-sub">Find and download any movie in seconds</p>
       </div>
+    </div>
+  </section>
+
+  <section id="view-library" class="view">
+    <div class="library-actions">
+      <button id="btn-import" onclick="importLibrary(this)">Import Movies</button>
+      <button id="btn-plex-sync" onclick="plexSync(this)">Sync Plex</button>
+    </div>
+    <div id="library-container"></div>
+    <div id="library-empty" class="empty-state">
+      <svg class="empty-icon"><use href="#icon-library"/></svg>
+      <p>No movies in your library</p>
+      <p class="empty-sub">Download a movie to see it here</p>
     </div>
   </section>
 
@@ -1031,10 +1479,14 @@ function fetchWithTimeout(url, opts, ms) {
 }
 
 /* ===== State ===== */
-let currentTab = 'search';
+let currentTab = 'explore';
 let refreshInterval = null;
 let searchResults = [];
 let lastSeedingHash = '';
+let prevActiveTorrents = new Set();
+let plexScanPending = false;
+let watchedMap = {};
+let exploreLoaded = false;
 
 /* ===== Init ===== */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1074,7 +1526,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  document.getElementById('explore-refresh-btn').addEventListener('click', function() {
+    this.classList.add('spinning');
+    var btn = this;
+    setTimeout(function() { btn.classList.remove('spinning'); }, 600);
+    exploreLoaded = false;
+    fetchExplore();
+  });
+
   checkHealth();
+  fetchExplore();
 });
 
 /* ===== Health check ===== */
@@ -1143,6 +1604,8 @@ function addBanner(container, message, showStart) {
 
 /* ===== Tabs ===== */
 function switchTab(tab) {
+  clearInterval(refreshInterval);
+  refreshInterval = null;
   currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
@@ -1151,9 +1614,11 @@ function switchTab(tab) {
   if (tab === 'downloads') {
     fetchDownloads();
     refreshInterval = setInterval(fetchDownloads, 3000);
-  } else {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
+  } else if (tab === 'library') {
+    fetchLibrary();
+  } else if (tab === 'explore') {
+    fetchExplore();
+  } else if (tab === 'search') {
     document.getElementById('search-input').focus();
   }
 }
@@ -1744,7 +2209,29 @@ async function fetchDownloads() {
   try {
     var res = await fetch('/api/qbt/torrents/info');
     if (!res.ok) throw new Error();
-    renderDownloads(await res.json());
+    var torrents = await res.json();
+
+    // Detect newly completed downloads
+    var currentActive = new Set();
+    torrents.forEach(function(t) {
+      if (t.progress < 1) currentActive.add(t.hash);
+    });
+    if (prevActiveTorrents.size > 0) {
+      var completed = false;
+      prevActiveTorrents.forEach(function(hash) {
+        if (!currentActive.has(hash)) completed = true;
+      });
+      if (completed && !plexScanPending) {
+        plexScanPending = true;
+        showToast('Scanning Plex library\u2026', 'info');
+        fetch('/api/plex/scan-library', { method: 'POST' })
+          .then(function() { plexScanPending = false; })
+          .catch(function() { plexScanPending = false; });
+      }
+    }
+    prevActiveTorrents = currentActive;
+
+    renderDownloads(torrents);
   } catch (e) {
     document.getElementById('active-container').textContent = '';
     document.getElementById('seeding-container').textContent = '';
@@ -1958,6 +2445,554 @@ function formatEta(seconds) {
   var m = Math.floor((seconds % 3600) / 60);
   var s = seconds % 60;
   return h ? h + 'h ' + m + 'm' : m + 'm ' + s + 's';
+}
+
+/* ===== Library ===== */
+async function fetchLibrary() {
+  var container = document.getElementById('library-container');
+  var empty = document.getElementById('library-empty');
+  try {
+    var [radarrRes, watchedRes] = await Promise.all([
+      fetch('/api/radarr/movie'),
+      fetch('/api/watched')
+    ]);
+    var library = await radarrRes.json();
+    var watchedList = await watchedRes.json();
+
+    // Build watchedMap keyed by tmdb_id
+    watchedMap = {};
+    watchedList.forEach(function(w) { watchedMap[w.tmdb_id] = w; });
+
+    // Filter to downloaded only
+    var downloaded = library.filter(function(m) { return m.hasFile; });
+    var tabLib = document.getElementById('tab-library');
+    tabLib.textContent = downloaded.length ? 'Library (' + downloaded.length + ')' : 'Library';
+
+    if (!downloaded.length) {
+      container.textContent = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    // Sort: unwatched first, then alphabetical
+    downloaded.sort(function(a, b) {
+      var aW = watchedMap[a.tmdbId] ? 1 : 0;
+      var bW = watchedMap[b.tmdbId] ? 1 : 0;
+      if (aW !== bW) return aW - bW;
+      return (a.title || '').localeCompare(b.title || '');
+    });
+
+    container.textContent = '';
+    var grid = document.createElement('div');
+    grid.className = 'library-grid';
+
+    downloaded.forEach(function(m, i) {
+      var w = watchedMap[m.tmdbId];
+      var card = document.createElement('div');
+      card.className = 'library-card';
+      card.style.animationDelay = (i * 15) + 'ms';
+
+      // Poster
+      var posterUrl = getPoster(m);
+      if (posterUrl) {
+        var img = document.createElement('img');
+        img.className = 'poster';
+        img.src = posterUrl;
+        img.alt = '';
+        img.loading = 'lazy';
+        card.appendChild(img);
+      } else {
+        var ph = document.createElement('div');
+        ph.className = 'poster-placeholder';
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        var u = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        u.setAttribute('href', '#icon-film');
+        svg.appendChild(u);
+        ph.appendChild(svg);
+        card.appendChild(ph);
+      }
+
+      // Info
+      var info = document.createElement('div');
+      info.className = 'library-info';
+
+      var title = document.createElement('div');
+      title.className = 'library-title';
+      title.textContent = m.title;
+      info.appendChild(title);
+
+      var meta = document.createElement('div');
+      meta.className = 'library-meta';
+
+      if (m.year) {
+        var year = document.createElement('span');
+        year.className = 'result-year';
+        year.textContent = m.year;
+        meta.appendChild(year);
+      }
+
+      var status = document.createElement('span');
+      status.className = 'library-status ' + (w ? 'watched' : 'unwatched');
+      status.textContent = w ? 'Watched' : 'Unwatched';
+      meta.appendChild(status);
+      info.appendChild(meta);
+
+      // Stars if watched
+      if (w && w.rating) {
+        info.appendChild(buildStars(w.rating));
+      }
+
+      // Review excerpt
+      if (w && w.review_text) {
+        var excerpt = document.createElement('div');
+        excerpt.className = 'library-review-excerpt';
+        excerpt.textContent = w.review_text;
+        info.appendChild(excerpt);
+      }
+
+      card.appendChild(info);
+
+      // Click to open review modal
+      (function(movie, watched) {
+        card.addEventListener('click', function() {
+          showReviewModal(movie, watched);
+        });
+      })(m, w);
+
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+  } catch (err) {
+    container.textContent = '';
+    empty.style.display = 'block';
+    document.getElementById('tab-library').textContent = 'Library';
+  }
+}
+
+function buildStars(rating) {
+  var div = document.createElement('div');
+  div.className = 'stars';
+  for (var i = 1; i <= 5; i++) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', i <= rating ? 'filled' : 'empty');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', i <= rating ? '#icon-star' : '#icon-star-outline');
+    svg.appendChild(use);
+    div.appendChild(svg);
+  }
+  return div;
+}
+
+function showReviewModal(movie, existingWatch) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  var modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.maxWidth = '480px';
+
+  // Header
+  var header = document.createElement('div');
+  header.className = 'modal-header';
+  var h2 = document.createElement('h2');
+  h2.textContent = movie.title + (movie.year ? ' (' + movie.year + ')' : '');
+  header.appendChild(h2);
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.addEventListener('click', function() { overlay.remove(); });
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  // Form body
+  var form = document.createElement('div');
+  form.className = 'review-form';
+
+  // Star picker
+  var pickerLabel = document.createElement('div');
+  pickerLabel.style.cssText = 'font-size:13px;font-weight:600;color:var(--text-2)';
+  pickerLabel.textContent = 'Rating';
+  form.appendChild(pickerLabel);
+
+  var picker = document.createElement('div');
+  picker.className = 'star-picker';
+  var selectedRating = existingWatch ? (existingWatch.rating || 0) : 0;
+
+  function updatePickerStars() {
+    picker.querySelectorAll('svg').forEach(function(svg, idx) {
+      svg.classList.toggle('active', idx < selectedRating);
+    });
+  }
+
+  for (var i = 1; i <= 5; i++) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#icon-star');
+    svg.appendChild(use);
+    (function(val) {
+      svg.addEventListener('click', function() {
+        selectedRating = val;
+        updatePickerStars();
+      });
+    })(i);
+    picker.appendChild(svg);
+  }
+  form.appendChild(picker);
+  updatePickerStars();
+
+  // Textarea
+  var taLabel = document.createElement('div');
+  taLabel.style.cssText = 'font-size:13px;font-weight:600;color:var(--text-2)';
+  taLabel.textContent = 'Review';
+  form.appendChild(taLabel);
+
+  var textarea = document.createElement('textarea');
+  textarea.className = 'review-textarea';
+  textarea.placeholder = 'Write your review...';
+  if (existingWatch && existingWatch.review_text) {
+    textarea.value = existingWatch.review_text;
+  }
+  form.appendChild(textarea);
+
+  // Actions
+  var actions = document.createElement('div');
+  actions.className = 'review-actions';
+
+  // Remove button (only if editing existing)
+  if (existingWatch) {
+    var removeBtn = document.createElement('button');
+    removeBtn.className = 'btn-remove-watched';
+    removeBtn.textContent = 'Remove from watched';
+    removeBtn.addEventListener('click', function() {
+      removeBtn.disabled = true;
+      removeBtn.textContent = 'Removing\u2026';
+      fetch('/api/watched/' + existingWatch.id, { method: 'DELETE' }).then(function(r) {
+        if (!r.ok) throw new Error();
+        overlay.remove();
+        showToast('Removed from watched', 'info');
+        fetchLibrary();
+      }).catch(function() {
+        showToast('Failed to remove', 'error');
+        removeBtn.disabled = false;
+        removeBtn.textContent = 'Remove from watched';
+      });
+    });
+    actions.appendChild(removeBtn);
+  }
+
+  // Notion button
+  var notionBtn = document.createElement('button');
+  notionBtn.className = 'btn-notion';
+  notionBtn.textContent = 'Push to Notion';
+  notionBtn.addEventListener('click', function() {
+    notionBtn.disabled = true;
+    notionBtn.textContent = 'Pushing\u2026';
+    var posterUrl = getPoster(movie) || '';
+    fetch('/api/notion/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: movie.title,
+        year: movie.year,
+        rating: selectedRating || null,
+        review_text: textarea.value,
+        watched_at: existingWatch ? existingWatch.watched_at : new Date().toISOString(),
+        poster_url: posterUrl
+      })
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Notion push failed'); });
+      notionBtn.classList.add('pushed');
+      notionBtn.textContent = 'Pushed';
+    }).catch(function(err) {
+      showToast(err.message, 'error');
+      notionBtn.disabled = false;
+      notionBtn.textContent = 'Push to Notion';
+    });
+  });
+  actions.appendChild(notionBtn);
+
+  // Save button
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'btn-save';
+  saveBtn.textContent = existingWatch ? 'Update' : 'Save';
+  saveBtn.addEventListener('click', function() {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving\u2026';
+    var posterUrl = getPoster(movie) || '';
+    fetch('/api/watched', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tmdb_id: movie.tmdbId,
+        title: movie.title,
+        year: movie.year,
+        rating: selectedRating || null,
+        review_text: textarea.value,
+        poster_url: posterUrl
+      })
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Save failed');
+      overlay.remove();
+      showToast(existingWatch ? 'Review updated' : 'Marked as watched', 'success');
+      fetchLibrary();
+    }).catch(function(err) {
+      showToast(err.message, 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = existingWatch ? 'Update' : 'Save';
+    });
+  });
+  actions.appendChild(saveBtn);
+
+  form.appendChild(actions);
+  modal.appendChild(form);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  textarea.focus();
+}
+
+/* ===== Explore ===== */
+async function fetchExplore() {
+  if (exploreLoaded) return;
+  var container = document.getElementById('explore-container');
+  var empty = document.getElementById('explore-empty');
+
+  container.textContent = '';
+  var loading = document.createElement('div');
+  loading.className = 'explore-loading';
+  var sp = document.createElement('span');
+  sp.className = 'spinner dark';
+  sp.style.width = '20px';
+  sp.style.height = '20px';
+  loading.appendChild(sp);
+  loading.appendChild(document.createElement('br'));
+  loading.appendChild(document.createElement('br'));
+  loading.appendChild(document.createTextNode('Loading discoveries\u2026'));
+  container.appendChild(loading);
+
+  try {
+    var [recRes, netflixRes, maxRes, huluRes, trendRes, radarrRes] = await Promise.all([
+      fetch('/api/tmdb/recommendations').catch(function() { return { ok: false }; }),
+      fetch('/api/tmdb/provider/netflix'),
+      fetch('/api/tmdb/provider/max'),
+      fetch('/api/tmdb/provider/hulu'),
+      fetch('/api/tmdb/trending'),
+      fetch('/api/radarr/movie').catch(function() { return { ok: false }; })
+    ]);
+
+    // Check for 503 (no API key)
+    if (trendRes.status === 503) {
+      container.textContent = '';
+      empty.style.display = 'block';
+      return;
+    }
+
+    var recommended = recRes.ok ? await recRes.json() : { results: [] };
+    var netflix = await netflixRes.json();
+    var max = await maxRes.json();
+    var hulu = await huluRes.json();
+    var trending = await trendRes.json();
+
+    // Build set of TMDB IDs already in Radarr library
+    var libraryTmdbIds = new Set();
+    if (radarrRes.ok) {
+      var radarrLib = await radarrRes.json();
+      radarrLib.forEach(function(m) { if (m.tmdbId) libraryTmdbIds.add(m.tmdbId); });
+    }
+
+    container.textContent = '';
+    empty.style.display = 'none';
+
+    var sections = [
+      { title: 'Recommended For You', movies: (recommended.results || []).slice(0, 20) },
+      { title: 'Popular on Netflix', movies: (netflix.results || []).slice(0, 20) },
+      { title: 'Popular on Max', movies: (max.results || []).slice(0, 20) },
+      { title: 'Popular on Hulu', movies: (hulu.results || []).slice(0, 20) },
+      { title: 'Trending', movies: (trending.results || []).slice(0, 20) }
+    ];
+
+    var cardIndex = 0;
+    sections.forEach(function(sec) {
+      if (!sec.movies.length) return;
+
+      var section = document.createElement('div');
+      section.className = 'explore-section';
+
+      var title = document.createElement('div');
+      title.className = 'explore-section-title';
+      title.textContent = sec.title;
+      section.appendChild(title);
+
+      var row = document.createElement('div');
+      row.className = 'explore-row';
+
+      sec.movies.forEach(function(m) {
+        var inLibrary = libraryTmdbIds.has(m.id);
+        var card = document.createElement('div');
+        card.className = 'explore-card' + (inLibrary ? ' in-library' : '');
+        card.style.animationDelay = (cardIndex * 20) + 'ms';
+        cardIndex++;
+
+        var posterWrap = document.createElement('div');
+        posterWrap.style.position = 'relative';
+
+        if (m.poster_path) {
+          var img = document.createElement('img');
+          img.src = 'https://image.tmdb.org/t/p/w185' + m.poster_path;
+          img.alt = '';
+          img.loading = 'lazy';
+          posterWrap.appendChild(img);
+        } else {
+          var ph = document.createElement('div');
+          ph.style.cssText = 'width:130px;height:195px;background:var(--surface-2);display:flex;align-items:center;justify-content:center';
+          var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('style', 'width:24px;height:24px;opacity:0.2;color:var(--text-3)');
+          var u = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+          u.setAttribute('href', '#icon-film');
+          svg.appendChild(u);
+          ph.appendChild(svg);
+          posterWrap.appendChild(ph);
+        }
+
+        if (inLibrary) {
+          var badge = document.createElement('div');
+          badge.className = 'in-library-badge';
+          var checkSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          checkSvg.setAttribute('viewBox', '0 0 24 24');
+          checkSvg.setAttribute('fill', 'none');
+          checkSvg.setAttribute('stroke', 'currentColor');
+          checkSvg.setAttribute('stroke-width', '3');
+          checkSvg.setAttribute('stroke-linecap', 'round');
+          checkSvg.setAttribute('stroke-linejoin', 'round');
+          var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          polyline.setAttribute('points', '20 6 9 17 4 12');
+          checkSvg.appendChild(polyline);
+          badge.appendChild(checkSvg);
+          posterWrap.appendChild(badge);
+        }
+
+        card.appendChild(posterWrap);
+
+        var info = document.createElement('div');
+        info.className = 'explore-card-info';
+        var cardTitle = document.createElement('div');
+        cardTitle.className = 'explore-card-title';
+        cardTitle.textContent = m.title;
+        info.appendChild(cardTitle);
+
+        var meta = document.createElement('div');
+        meta.className = 'explore-card-meta';
+        var year = (m.release_date || '').slice(0, 4);
+        if (year) {
+          var yearSpan = document.createElement('span');
+          yearSpan.textContent = year;
+          meta.appendChild(yearSpan);
+        }
+        if (m.vote_average) {
+          var ratingSpan = document.createElement('span');
+          ratingSpan.className = 'explore-card-rating';
+          ratingSpan.textContent = '\u2605 ' + m.vote_average.toFixed(1);
+          meta.appendChild(ratingSpan);
+        }
+        info.appendChild(meta);
+        card.appendChild(info);
+
+        if (inLibrary) {
+          card.addEventListener('click', function() { showToast('Already in library', 'info'); });
+        } else {
+          card.addEventListener('click', function() { addFromExplore(m, card); });
+        }
+        row.appendChild(card);
+      });
+
+      section.appendChild(row);
+      container.appendChild(section);
+    });
+
+    exploreLoaded = true;
+  } catch (err) {
+    container.textContent = '';
+    empty.style.display = 'block';
+  }
+}
+
+async function addFromExplore(tmdbMovie, card) {
+  if (card.classList.contains('loading') || card.classList.contains('added')) return;
+  card.classList.add('loading');
+
+  try {
+    // Look up in Radarr
+    var res = await fetch('/api/radarr/movie/lookup/tmdb?tmdbId=' + tmdbMovie.id);
+    if (!res.ok) throw new Error('Lookup failed');
+    var radarrMovie = await res.json();
+
+    // Store as searchResults[0] and use existing addMovie flow
+    searchResults[0] = radarrMovie;
+
+    // Create temp button for addMovie
+    var tempBtn = document.createElement('button');
+    tempBtn.className = 'add-btn';
+
+    await addMovie(0, tempBtn);
+    card.classList.remove('loading');
+    card.classList.add('added');
+  } catch (err) {
+    card.classList.remove('loading');
+    showToast(err.message || 'Failed to add movie', 'error');
+  }
+}
+
+/* ===== Import & Plex Sync ===== */
+function setBtnLoading(btn, label) {
+  btn.disabled = true;
+  btn.textContent = '';
+  var spinner = document.createElement('span');
+  spinner.className = 'spin';
+  btn.appendChild(spinner);
+  btn.appendChild(document.createTextNode(' ' + label));
+}
+
+function setBtnDone(btn, label) {
+  btn.disabled = false;
+  btn.textContent = label;
+}
+
+async function importLibrary(btn) {
+  var orig = btn.textContent;
+  setBtnLoading(btn, 'Importing\u2026');
+  try {
+    var res = await fetch('/api/import-library', { method: 'POST' });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import failed');
+    var msg = 'Added ' + data.added + ' movies';
+    if (data.skipped) msg += ', ' + data.skipped + ' already in Radarr';
+    if (data.failed && data.failed.length) msg += ', ' + data.failed.length + ' failed';
+    showToast(msg, data.failed && data.failed.length ? 'warning' : 'success');
+    fetchLibrary();
+  } catch (err) {
+    showToast(err.message || 'Import failed', 'error');
+  }
+  setBtnDone(btn, orig);
+}
+
+async function plexSync(btn) {
+  var orig = btn.textContent;
+  setBtnLoading(btn, 'Syncing\u2026');
+  try {
+    var res = await fetch('/api/plex/sync-watched', { method: 'POST' });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sync failed');
+    showToast('Synced ' + data.synced + ' new watched (' + data.total_watched + ' total in Plex)', 'success');
+    fetchLibrary();
+  } catch (err) {
+    showToast(err.message || 'Plex sync failed', 'error');
+  }
+  setBtnDone(btn, orig);
 }
 
 /* ===== Toast ===== */
