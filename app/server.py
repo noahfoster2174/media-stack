@@ -122,6 +122,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._ensure_services()
         elif self.path.startswith("/api/radarr/"):
             self._proxy_radarr()
+        elif self.path.startswith("/api/qbt/"):
+            self._proxy_qbt_post()
+        else:
+            self.send_error(404)
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/radarr/"):
+            self._proxy_radarr()
         else:
             self.send_error(404)
 
@@ -184,6 +192,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._relay(e.code, e.read(), "application/json")
             except urllib.error.URLError:
                 return self.send_error(502, "qBittorrent unreachable — is Docker running?")
+
+    def _proxy_qbt_post(self):
+        """Proxy POST to qBittorrent (e.g. torrents/delete)."""
+        global qbt_sid
+        api_path = self.path[len("/api/qbt/"):]
+        url = f"{QBT_URL}/api/v2/{api_path}"
+        n = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(n) if n else None
+        if not qbt_sid and not qbt_login():
+            return self.send_error(502, "qBittorrent auth failed")
+        for attempt in range(2):
+            try:
+                req = urllib.request.Request(url, data=body, method="POST")
+                req.add_header("Cookie", f"SID={qbt_sid}")
+                if body:
+                    req.add_header("Content-Type", self.headers.get("Content-Type", "application/x-www-form-urlencoded"))
+                resp = urllib.request.urlopen(req)
+                return self._relay(200, resp.read(), resp.getheader("Content-Type", "text/plain"))
+            except urllib.error.HTTPError as e:
+                if e.code == 403 and attempt == 0:
+                    qbt_sid = None
+                    if qbt_login():
+                        continue
+                    return self.send_error(502, "qBittorrent re-auth failed")
+                return self._relay(e.code, e.read(), "text/plain")
+            except urllib.error.URLError:
+                return self.send_error(502, "qBittorrent unreachable")
 
     def _relay(self, status, data, content_type):
         self.send_response(status)

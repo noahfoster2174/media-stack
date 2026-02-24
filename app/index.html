@@ -452,6 +452,159 @@
 
   .health-banner .dismiss:hover { opacity: 1; }
 
+  /* ===== Release picker modal ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 14px;
+    width: 90%;
+    max-width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: cardIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .modal-header {
+    padding: 18px 20px 14px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .modal-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body {
+    overflow-y: auto;
+    padding: 8px 0;
+    flex: 1;
+  }
+
+  .modal-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text2);
+    font-size: 14px;
+  }
+
+  .release-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .release-row:hover { background: var(--surface-hover); }
+
+  .release-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .release-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .release-meta {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 2px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .release-size {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .release-grab {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+
+  .release-grab:hover { background: var(--accent-hover); }
+  .release-grab:disabled { opacity: 0.4; cursor: default; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ===== Download card remove button ===== */
+  .dl-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .dl-header .dl-name { margin-bottom: 0; }
+
+  .dl-remove {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 2px;
+    flex-shrink: 0;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+
+  .dl-card:hover .dl-remove { opacity: 1; }
+  .dl-remove:hover { color: var(--red); }
+
   /* ===== Toast ===== */
   .toast {
     position: fixed;
@@ -806,9 +959,10 @@ async function addMovie(idx, btn) {
   btn.textContent = '\u2026';
 
   try {
-    // Ensure Docker + Mullvad are running before adding
+    // Ensure Docker + Mullvad are running
     await fetch('/api/ensure-services', { method: 'POST' });
 
+    // Add to Radarr WITHOUT auto-search
     var res = await fetch('/api/radarr/movie', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -822,34 +976,206 @@ async function addMovie(idx, btn) {
         rootFolderPath: '/movies',
         monitored: true,
         minimumAvailability: 'released',
-        addOptions: { searchForMovie: true }
+        addOptions: { searchForMovie: false }
       })
     });
 
     var data = await res.json();
+    var movieId = null;
 
     if (res.ok && data.id) {
+      movieId = data.id;
       btn.classList.add('added');
       btn.textContent = '\u2713';
-      showToast('Added: ' + m.title + ' (' + m.year + ')', 'success');
-      setTimeout(function() { switchTab('downloads'); }, 2000);
     } else if (Array.isArray(data)) {
       var msg = data.map(function(e) { return e.errorMessage; }).filter(Boolean).join('; ');
       if (msg.toLowerCase().indexOf('already') !== -1) {
-        showToast('Already in library: ' + m.title, 'warning');
+        // Already in library — still let them pick a release
         btn.classList.add('added');
         btn.textContent = '\u2713';
+        // Find the movie ID from the library
+        var libRes = await fetch('/api/radarr/movie');
+        var library = await libRes.json();
+        var existing = library.find(function(mov) { return mov.tmdbId === m.tmdbId; });
+        if (existing) movieId = existing.id;
       } else {
         throw new Error(msg || 'Failed to add movie');
       }
     } else {
       throw new Error(data.message || 'Unknown error');
     }
+
+    // Show release picker
+    if (movieId) {
+      showReleasePicker(movieId, m.title + ' (' + m.year + ')');
+    }
   } catch (err) {
     showToast(err.message, 'error');
     btn.disabled = false;
     btn.textContent = '+';
   }
+}
+
+/* ===== Release Picker ===== */
+function showReleasePicker(movieId, movieTitle) {
+  // Create modal
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  var modal = document.createElement('div');
+  modal.className = 'modal';
+
+  // Header
+  var header = document.createElement('div');
+  header.className = 'modal-header';
+  var h2 = document.createElement('h2');
+  h2.textContent = movieTitle;
+  header.appendChild(h2);
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'modal-close';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.addEventListener('click', function() { overlay.remove(); });
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  // Body
+  var body = document.createElement('div');
+  body.className = 'modal-body';
+  var loading = document.createElement('div');
+  loading.className = 'modal-loading';
+  loading.innerHTML = '<span class="spinner" style="border-color:var(--text2);border-top-color:var(--text);width:20px;height:20px"></span><br><br>Searching for releases\u2026';
+  body.appendChild(loading);
+  modal.appendChild(body);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Fetch releases
+  fetch('/api/radarr/release?movieId=' + movieId).then(function(r) {
+    if (!r.ok) throw new Error('Failed to fetch releases');
+    return r.json();
+  }).then(function(releases) {
+    body.textContent = '';
+
+    if (!releases.length) {
+      var empty = document.createElement('div');
+      empty.className = 'modal-loading';
+      empty.textContent = 'No releases found. Try again later.';
+      body.appendChild(empty);
+      return;
+    }
+
+    // Sort: by seeders (descending), then size (ascending)
+    releases.sort(function(a, b) {
+      return (b.seeders || 0) - (a.seeders || 0);
+    });
+
+    releases.slice(0, 25).forEach(function(rel) {
+      var row = document.createElement('div');
+      row.className = 'release-row';
+
+      var info = document.createElement('div');
+      info.className = 'release-info';
+
+      var title = document.createElement('div');
+      title.className = 'release-title';
+      title.textContent = rel.title;
+      info.appendChild(title);
+
+      var meta = document.createElement('div');
+      meta.className = 'release-meta';
+
+      var quality = document.createElement('span');
+      quality.textContent = rel.quality ? rel.quality.quality.name : '?';
+      meta.appendChild(quality);
+
+      if (rel.seeders !== undefined) {
+        var seeders = document.createElement('span');
+        seeders.textContent = rel.seeders + ' seed' + (rel.seeders !== 1 ? 's' : '');
+        meta.appendChild(seeders);
+      }
+
+      if (rel.indexer) {
+        var indexer = document.createElement('span');
+        indexer.textContent = rel.indexer;
+        meta.appendChild(indexer);
+      }
+
+      info.appendChild(meta);
+      row.appendChild(info);
+
+      var sizeEl = document.createElement('div');
+      sizeEl.className = 'release-size';
+      sizeEl.textContent = formatSize(rel.size);
+      row.appendChild(sizeEl);
+
+      var grabBtn = document.createElement('button');
+      grabBtn.className = 'release-grab';
+      grabBtn.textContent = 'Download';
+      grabBtn.addEventListener('click', function() {
+        grabRelease(rel, grabBtn, overlay);
+      });
+      row.appendChild(grabBtn);
+
+      body.appendChild(row);
+    });
+  }).catch(function(err) {
+    body.textContent = '';
+    var errMsg = document.createElement('div');
+    errMsg.className = 'modal-loading';
+    errMsg.textContent = err.message;
+    body.appendChild(errMsg);
+  });
+}
+
+function grabRelease(release, btn, overlay) {
+  btn.disabled = true;
+  btn.textContent = '\u2026';
+
+  fetch('/api/radarr/release', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      guid: release.guid,
+      indexerId: release.indexerId
+    })
+  }).then(function(r) {
+    if (!r.ok) throw new Error('Grab failed');
+    overlay.remove();
+    showToast('Downloading: ' + release.title, 'success');
+    setTimeout(function() { switchTab('downloads'); }, 1500);
+  }).catch(function(err) {
+    showToast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Download';
+  });
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '?';
+  var gb = bytes / 1073741824;
+  if (gb >= 1) return gb.toFixed(1) + ' GB';
+  return (bytes / 1048576).toFixed(0) + ' MB';
+}
+
+/* ===== Remove torrent ===== */
+function removeTorrent(hash, name) {
+  if (!confirm('Remove "' + name + '" from downloads?')) return;
+
+  fetch('/api/qbt/torrents/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'hashes=' + encodeURIComponent(hash) + '&deleteFiles=true'
+  }).then(function(r) {
+    if (!r.ok) throw new Error('Delete failed');
+    showToast('Removed: ' + name, 'info');
+    fetchDownloads();
+  }).catch(function(err) {
+    showToast(err.message, 'error');
+  });
 }
 
 /* ===== Downloads ===== */
@@ -914,10 +1240,21 @@ function renderDownloads(torrents) {
       card.className = 'dl-card';
       card.dataset.hash = t.hash;
 
+      var dlHeader = document.createElement('div');
+      dlHeader.className = 'dl-header';
       var name = document.createElement('div');
       name.className = 'dl-name';
       name.textContent = t.name;
-      card.appendChild(name);
+      dlHeader.appendChild(name);
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'dl-remove';
+      removeBtn.title = 'Remove';
+      removeBtn.textContent = '\u00d7';
+      (function(hash, tname) {
+        removeBtn.addEventListener('click', function() { removeTorrent(hash, tname); });
+      })(t.hash, t.name);
+      dlHeader.appendChild(removeBtn);
+      card.appendChild(dlHeader);
 
       var track = document.createElement('div');
       track.className = 'dl-bar-track';
