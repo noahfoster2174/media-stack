@@ -74,8 +74,6 @@
   }
 
   .header-inner {
-    max-width: 720px;
-    margin: 0 auto;
     padding: 16px 24px 0;
   }
 
@@ -148,8 +146,6 @@
 
   .view {
     display: none;
-    max-width: 720px;
-    margin: 0 auto;
     padding: 24px;
     padding-bottom: 80px;
   }
@@ -428,8 +424,7 @@
 
   /* ===== Health banner ===== */
   .health-banner {
-    max-width: 720px;
-    margin: 0 auto 16px;
+    margin: 0 0 16px;
     padding: 10px 16px;
     border-radius: var(--radius-sm);
     background: rgba(255, 59, 48, 0.1);
@@ -557,7 +552,7 @@
 </header>
 
 <main>
-  <div id="health-banners" style="max-width:720px; margin:0 auto; padding:24px 24px 0"></div>
+  <div id="health-banners" style="padding:24px 24px 0"></div>
   <section id="view-search" class="view active">
     <div class="search-bar">
       <input type="text" id="search-input" placeholder="Search for a movie..." autofocus>
@@ -905,12 +900,15 @@ function renderDownloads(torrents) {
     var sizeGB = (t.size / 1073741824).toFixed(1);
     var speedMB = (t.dlspeed / 1048576).toFixed(1);
     var eta = formatEta(t.eta);
+    var isMeta = t.size === 0 || t.state === 'metaDL';
+    var pctText = isMeta ? 'Fetching metadata\u2026' : pct + '% of ' + sizeGB + ' GB';
+    var speedText = isMeta ? 'Waiting for peers' : speedMB + ' MB/s \u00b7 ETA ' + eta;
     var card = activeEl.querySelector('[data-hash="' + CSS.escape(t.hash) + '"]');
 
     if (card) {
-      card.querySelector('.dl-bar-fill').style.width = pct + '%';
-      card.querySelector('.dl-pct').textContent = pct + '% of ' + sizeGB + ' GB';
-      card.querySelector('.dl-speed').textContent = speedMB + ' MB/s \u00b7 ETA ' + eta;
+      card.querySelector('.dl-bar-fill').style.width = (isMeta ? '0' : pct) + '%';
+      card.querySelector('.dl-pct').textContent = pctText;
+      card.querySelector('.dl-speed').textContent = speedText;
     } else {
       card = document.createElement('div');
       card.className = 'dl-card';
@@ -933,10 +931,10 @@ function renderDownloads(torrents) {
       meta.className = 'dl-meta';
       var pctSpan = document.createElement('span');
       pctSpan.className = 'dl-pct';
-      pctSpan.textContent = pct + '% of ' + sizeGB + ' GB';
+      pctSpan.textContent = pctText;
       var speedSpan = document.createElement('span');
       speedSpan.className = 'dl-speed';
-      speedSpan.textContent = speedMB + ' MB/s \u00b7 ETA ' + eta;
+      speedSpan.textContent = speedText;
       meta.appendChild(pctSpan);
       meta.appendChild(speedSpan);
       card.appendChild(meta);
@@ -998,7 +996,7 @@ function updateBadge(count) {
 }
 
 function formatEta(seconds) {
-  if (!seconds || seconds <= 0 || seconds > 8640000) return '\u2014';
+  if (!seconds || seconds <= 0 || seconds >= 8640000) return '\u2014';
   var h = Math.floor(seconds / 3600);
   var m = Math.floor((seconds % 3600) / 60);
   var s = seconds % 60;
