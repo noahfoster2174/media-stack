@@ -6,7 +6,7 @@ APP_DIR="$HOME/media-stack/app"
 
 # Reuse running server
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-    open "http://localhost:$PORT"
+    open -na "Google Chrome" --args --app="http://localhost:$PORT"
     exit 0
 fi
 
@@ -21,4 +21,4 @@ for i in {1..20}; do
     sleep 0.25
 done
 
-open "http://localhost:$PORT"
+open -na "Google Chrome" --args --app="http://localhost:$PORT"
