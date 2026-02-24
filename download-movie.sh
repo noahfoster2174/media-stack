@@ -9,9 +9,61 @@ RADARR_URL="http://localhost:7878"
 RADARR_API_KEY="REDACTED_API_KEY"
 QUALITY_PROFILE_ID=4  # HD-1080p
 
+QBT_URL="http://localhost:8080"
+QBT_USER="admin"
+QBT_PASS="REDACTED_PASSWORD"
+
+# --- Status mode: show all active downloads ---
+if [ "${1:-}" = "--status" ]; then
+    # Login to qBittorrent
+    QBT_COOKIE=$(curl -s -c - -X POST "$QBT_URL/api/v2/auth/login" \
+        -d "username=$QBT_USER&password=$QBT_PASS" 2>/dev/null | grep SID | awk '{print $NF}')
+
+    if [ -z "$QBT_COOKIE" ]; then
+        echo "ERROR: Cannot connect to qBittorrent"
+        exit 1
+    fi
+
+    curl -s -b "SID=$QBT_COOKIE" "$QBT_URL/api/v2/torrents/info" 2>/dev/null | python3 -c "
+import sys, json
+torrents = json.load(sys.stdin)
+active = [t for t in torrents if t.get('progress', 1) < 1]
+seeding = [t for t in torrents if t.get('progress', 0) >= 1]
+
+if not active and not seeding:
+    print('No active downloads.')
+    sys.exit(0)
+
+if active:
+    for t in active:
+        name = t.get('name', '?')
+        pct = t.get('progress', 0) * 100
+        size_gb = t.get('size', 0) / (1024**3)
+        speed_mb = t.get('dlspeed', 0) / (1024**2)
+        eta = t.get('eta', 0)
+        if eta > 0 and eta < 8640000:
+            mins, secs = divmod(eta, 60)
+            hrs, mins = divmod(mins, 60)
+            eta_str = f'{hrs}h{mins:02d}m' if hrs else f'{mins}m{secs:02d}s'
+        else:
+            eta_str = '??'
+        bar_len = 20
+        filled = int(bar_len * pct / 100)
+        bar = '█' * filled + '░' * (bar_len - filled)
+        print(f'{name}')
+        print(f'  {bar} {pct:.1f}% of {size_gb:.1f} GB  |  {speed_mb:.1f} MB/s  |  ETA: {eta_str}')
+        print()
+
+if seeding:
+    print(f'Seeding: {len(seeding)} torrent(s)')
+"
+    exit 0
+fi
+
 if [ $# -eq 0 ] || [ -z "$1" ]; then
     echo "ERROR: No movie name provided"
     echo "Usage: ./download-movie.sh \"Movie Name\""
+    echo "       ./download-movie.sh --status"
     exit 1
 fi
 
