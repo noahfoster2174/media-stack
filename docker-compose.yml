@@ -14,8 +14,6 @@ services:
       - "${HOME}/Downloads/TV Shows:/tv"
     ports:
       - 8080:8080
-      - 6881:6881
-      - 6881:6881/udp
     restart: unless-stopped
 
   prowlarr:
