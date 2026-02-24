@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proxy server for Download Movie web app. Stdlib only, no pip installs."""
+"""Proxy server for Reelz web app. Stdlib only, no pip installs."""
 
 import http.server
 import json
@@ -235,8 +235,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    srv = http.server.HTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Download Movie server running at http://localhost:{PORT}")
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    print(f"Reelz server running at http://localhost:{PORT}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
