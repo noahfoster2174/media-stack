@@ -2,19 +2,92 @@
 """Proxy server for Download Movie web app. Stdlib only, no pip installs."""
 
 import http.server
+import json
+import os
+import subprocess
 import urllib.request
 import urllib.parse
 import urllib.error
 from pathlib import Path
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+
+def load_env():
+    """Read key=value pairs from .env file."""
+    env = {}
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    return env
+
+
+_env = load_env()
+
 PORT = 9999
 RADARR_URL = "http://localhost:7878"
-RADARR_API_KEY = "REDACTED_API_KEY"
+RADARR_API_KEY = _env.get("RADARR_API_KEY", "REDACTED_API_KEY")
 QBT_URL = "http://localhost:8080"
-QBT_USER = "admin"
-QBT_PASS = "REDACTED_PASSWORD"
+QBT_USER = _env.get("QBT_USER", "admin")
+QBT_PASS = _env.get("QBT_PASS", "REDACTED_PASSWORD")
+COMPOSE_DIR = ENV_FILE.parent
 
 qbt_sid = None
+
+
+def ensure_services():
+    """Start Docker, Mullvad, and docker compose if not already running."""
+    results = {}
+
+    # 1. Mullvad VPN
+    try:
+        status = subprocess.run(
+            ["mullvad", "status"], capture_output=True, text=True, timeout=5
+        )
+        if "Connected" not in status.stdout:
+            subprocess.run(["mullvad", "connect"], timeout=10)
+            results["mullvad"] = "connecting"
+        else:
+            results["mullvad"] = "already connected"
+    except Exception as e:
+        results["mullvad"] = f"error: {e}"
+
+    # 2. Docker Desktop
+    try:
+        info = subprocess.run(
+            ["docker", "info"], capture_output=True, text=True, timeout=5
+        )
+        if info.returncode != 0:
+            subprocess.run(["open", "-a", "Docker"], timeout=5)
+            results["docker"] = "starting"
+        else:
+            results["docker"] = "already running"
+    except Exception as e:
+        results["docker"] = f"error: {e}"
+
+    # 3. Docker Compose stack
+    try:
+        ps = subprocess.run(
+            ["docker", "compose", "ps", "--format", "{{.State}}"],
+            capture_output=True, text=True, timeout=10, cwd=str(COMPOSE_DIR)
+        )
+        states = [s.strip() for s in ps.stdout.strip().splitlines() if s.strip()]
+        if not states or any(s != "running" for s in states):
+            subprocess.Popen(
+                ["docker", "compose", "up", "-d"],
+                cwd=str(COMPOSE_DIR),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            results["compose"] = "starting"
+        else:
+            results["compose"] = "already running"
+    except Exception as e:
+        results["compose"] = f"error: {e}"
+
+    return results
 
 
 def qbt_login():
@@ -45,10 +118,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        if self.path.startswith("/api/radarr/"):
+        if self.path == "/api/ensure-services":
+            self._ensure_services()
+        elif self.path.startswith("/api/radarr/"):
             self._proxy_radarr()
         else:
             self.send_error(404)
+
+    def _ensure_services(self):
+        results = ensure_services()
+        data = json.dumps(results).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _serve_index(self):
         p = Path(__file__).parent / "index.html"

@@ -5,13 +5,20 @@
 
 set -euo pipefail
 
+# Load credentials from .env (fall back to defaults)
+ENV_FILE="$(cd "$(dirname "$0")" && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    set -a; source "$ENV_FILE"; set +a
+fi
+
 RADARR_URL="http://localhost:7878"
-RADARR_API_KEY="REDACTED_API_KEY"
+RADARR_API_KEY="${RADARR_API_KEY:-REDACTED_API_KEY}"
 QUALITY_PROFILE_ID=4  # HD-1080p
 
 QBT_URL="http://localhost:8080"
-QBT_USER="admin"
-QBT_PASS="REDACTED_PASSWORD"
+QBT_USER="${QBT_USER:-admin}"
+QBT_PASS="${QBT_PASS:-REDACTED_PASSWORD}"
 
 # --- Status mode: show all active downloads ---
 if [ "${1:-}" = "--status" ]; then
