@@ -23,7 +23,16 @@ fi
 # Start new server
 cd "$APP_DIR"
 python3 server.py &
-echo $! > "$PID_FILE"
+SERVER_PID=$!
+
+# Verify process is still alive after a beat
+sleep 0.5
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    osascript -e 'display alert "Download Movie" message "Server failed to start. Check ~/media-stack/app/server.py"'
+    exit 1
+fi
+
+echo "$SERVER_PID" > "$PID_FILE"
 
 # Wait for server ready (up to 5s)
 for i in {1..20}; do
