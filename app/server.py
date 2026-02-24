@@ -9,6 +9,7 @@ import random
 import re
 import sqlite3
 import subprocess
+import concurrent.futures
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -45,6 +46,8 @@ TMDB_API_KEY = _env.get("TMDB_API_KEY", "")
 TMDB_BASE = "https://api.themoviedb.org/3"
 PLEX_URL = _env.get("PLEX_URL", "http://localhost:32400")
 PLEX_TOKEN = _env.get("PLEX_TOKEN", "")
+ANTHROPIC_API_KEY = _env.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = "claude-sonnet-4-6"
 MOVIES_DIR = Path.home() / "Downloads" / "Movies"
 DB_PATH = Path(__file__).resolve().parent / "data.db"
 
@@ -180,6 +183,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._plex_sync_watched()
         elif self.path == "/api/plex/scan-library":
             self._plex_scan_library()
+        elif self.path == "/api/chat":
+            self._chat()
         elif self.path.startswith("/api/radarr/"):
             self._proxy_radarr()
         elif self.path.startswith("/api/qbt/"):
@@ -372,7 +377,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         tmdb_path = self._TMDB_ROUTES.get(key)
         if not tmdb_path:
             return self.send_error(404)
-        url = f"{TMDB_BASE}{tmdb_path}?api_key={TMDB_API_KEY}"
+        url = f"{TMDB_BASE}{tmdb_path}?api_key={TMDB_API_KEY}&region=US"
         try:
             req = urllib.request.Request(url)
             resp = urllib.request.urlopen(req)
@@ -409,20 +414,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
         lib_id_set = set(lib_ids)
         seeds = random.sample(lib_ids, min(5, len(lib_ids)))
 
-        # Fetch recommendations for each seed
+        # Fetch recommendations for each seed (parallel)
+        def fetch_rec(seed_id):
+            url = f"{TMDB_BASE}/movie/{seed_id}/recommendations?api_key={TMDB_API_KEY}"
+            resp = urllib.request.urlopen(url)
+            return json.loads(resp.read()).get("results", [])
+
         seen = {}
-        for seed_id in seeds:
-            try:
-                url = f"{TMDB_BASE}/movie/{seed_id}/recommendations?api_key={TMDB_API_KEY}"
-                req = urllib.request.Request(url)
-                resp = urllib.request.urlopen(req)
-                data = json.loads(resp.read())
-                for movie in data.get("results", []):
-                    mid = movie["id"]
-                    if mid not in lib_id_set and mid not in seen:
-                        seen[mid] = movie
-            except Exception:
-                continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(fetch_rec, sid): sid for sid in seeds}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    for movie in future.result():
+                        mid = movie["id"]
+                        if mid not in lib_id_set and mid not in seen:
+                            seen[mid] = movie
+                except Exception:
+                    continue
 
         # Sort by quality-weighted popularity, take top 20
         results = sorted(seen.values(), key=lambda m: m.get("vote_average", 0) * m.get("vote_count", 0), reverse=True)[:20]
@@ -632,7 +640,69 @@ class Handler(http.server.BaseHTTPRequestHandler):
         conn.commit()
         conn.close()
 
-        result = {"synced": synced, "total_watched": total_watched}
+        # Second pass: import Plex watched movies missing from Radarr
+        radarr_added = 0
+        plex_tmdb_movies = []
+        for video in root.iter("Video"):
+            if int(video.get("viewCount", "0")) == 0:
+                continue
+            tmdb_id = None
+            for guid in video.findall("Guid"):
+                gid = guid.get("id", "")
+                if gid.startswith("tmdb://"):
+                    tmdb_id = int(gid[7:])
+                    break
+            if tmdb_id:
+                plex_tmdb_movies.append(tmdb_id)
+
+        if plex_tmdb_movies:
+            try:
+                req = urllib.request.Request(
+                    f"{RADARR_URL}/api/v3/movie",
+                    headers={"X-Api-Key": RADARR_API_KEY},
+                )
+                resp = urllib.request.urlopen(req)
+                radarr_lib = json.loads(resp.read())
+                radarr_ids = {m["tmdbId"] for m in radarr_lib if m.get("tmdbId")}
+            except Exception:
+                radarr_ids = None  # skip import if Radarr unreachable
+
+            if radarr_ids is not None:
+                missing = [tid for tid in plex_tmdb_movies if tid not in radarr_ids]
+                for tid in missing:
+                    try:
+                        lookup_req = urllib.request.Request(
+                            f"{RADARR_URL}/api/v3/movie/lookup/tmdb?tmdbId={tid}",
+                            headers={"X-Api-Key": RADARR_API_KEY},
+                        )
+                        lookup_resp = urllib.request.urlopen(lookup_req)
+                        hit = json.loads(lookup_resp.read())
+                        add_body = json.dumps({
+                            "title": hit.get("title", ""),
+                            "tmdbId": hit["tmdbId"],
+                            "titleSlug": hit.get("titleSlug", ""),
+                            "images": hit.get("images", []),
+                            "qualityProfileId": 4,
+                            "rootFolderPath": "/movies",
+                            "monitored": True,
+                            "minimumAvailability": "released",
+                            "addOptions": {"searchForMovie": False},
+                        }).encode()
+                        add_req = urllib.request.Request(
+                            f"{RADARR_URL}/api/v3/movie",
+                            data=add_body,
+                            headers={
+                                "X-Api-Key": RADARR_API_KEY,
+                                "Content-Type": "application/json",
+                            },
+                            method="POST",
+                        )
+                        urllib.request.urlopen(add_req)
+                        radarr_added += 1
+                    except Exception:
+                        pass
+
+        result = {"synced": synced, "total_watched": total_watched, "radarr_added": radarr_added}
         self._relay(200, json.dumps(result).encode(), "application/json")
 
     def _plex_scan_library(self):
@@ -655,6 +725,127 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._relay(502, json.dumps(
                 {"error": f"Plex unreachable: {e}"}
             ).encode(), "application/json")
+
+    # ---- Chat ----
+
+    def _build_chat_context(self):
+        """Build system prompt with Radarr library and watched history."""
+        lines = [
+            "You are a helpful movie recommendation assistant for the Reelz app.",
+            "You have access to the user's movie library and watch history.",
+            "Use this context to give personalized recommendations.",
+            "Be concise and conversational.",
+            "",
+            "## User's Downloaded Library",
+        ]
+        # Fetch Radarr library
+        try:
+            req = urllib.request.Request(
+                f"{RADARR_URL}/api/v3/movie",
+                headers={"X-Api-Key": RADARR_API_KEY},
+            )
+            resp = urllib.request.urlopen(req)
+            library = json.loads(resp.read())
+            downloaded = [m for m in library if m.get("hasFile")]
+            if downloaded:
+                for m in sorted(downloaded, key=lambda x: x.get("title", "")):
+                    lines.append(f"- {m.get('title', '?')} ({m.get('year', '?')})")
+            else:
+                lines.append("(empty)")
+        except Exception:
+            lines.append("(unavailable)")
+
+        lines.append("")
+        lines.append("## Watched & Rated Movies")
+        # Fetch watched from SQLite
+        try:
+            conn = get_db()
+            rows = conn.execute(
+                "SELECT title, year, rating, review_text FROM watched ORDER BY watched_at DESC"
+            ).fetchall()
+            conn.close()
+            if rows:
+                for r in rows:
+                    entry = f"- {r['title']} ({r['year'] or '?'})"
+                    if r["rating"]:
+                        entry += f" -- rated {r['rating']}/5"
+                    if r["review_text"]:
+                        entry += f" ({r['review_text']})"
+                    lines.append(entry)
+            else:
+                lines.append("(none yet)")
+        except Exception:
+            lines.append("(unavailable)")
+
+        return "\n".join(lines)
+
+    def _chat(self):
+        """Stream Claude chat responses via SSE."""
+        if not ANTHROPIC_API_KEY:
+            return self._relay(
+                400,
+                json.dumps({"error": "Add ANTHROPIC_API_KEY to .env"}).encode(),
+                "application/json",
+            )
+
+        n = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(n)) if n else {}
+        messages = body.get("messages", [])
+
+        if not isinstance(messages, list) or not messages:
+            return self._relay(400, json.dumps({"error": "messages array required"}).encode(), "application/json")
+
+        system_prompt = self._build_chat_context()
+
+        api_body = json.dumps({
+            "model": ANTHROPIC_MODEL,
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": messages,
+            "stream": True,
+        }).encode()
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=api_body,
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            resp = urllib.request.urlopen(req, timeout=60)
+        except urllib.error.HTTPError as e:
+            err_body = e.read()
+            return self._relay(e.code, err_body, "application/json")
+        except urllib.error.URLError as e:
+            return self._relay(
+                502,
+                json.dumps({"error": f"Anthropic API unreachable: {e}"}).encode(),
+                "application/json",
+            )
+
+        # Stream SSE to client
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        try:
+            while True:
+                line = resp.readline()
+                if not line:
+                    break
+                self.wfile.write(line)
+                self.wfile.flush()
+        except BrokenPipeError:
+            pass
+        finally:
+            resp.close()
 
     def _relay(self, status, data, content_type):
         self.send_response(status)

@@ -1354,6 +1354,134 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  /* ===== Chat ===== */
+  #view-chat { padding: 0; }
+  #view-chat.active { display: flex; }
+
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 56px);
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chat-messages::-webkit-scrollbar { width: 6px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+  }
+
+  .chat-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.55;
+    animation: cardIn 0.25s ease both;
+    word-wrap: break-word;
+  }
+
+  .chat-bubble.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: var(--radius-xs);
+  }
+
+  .chat-bubble.assistant {
+    align-self: flex-start;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-left-radius: var(--radius-xs);
+  }
+
+  .chat-bubble-text { white-space: pre-wrap; }
+  .chat-bubble-text code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  .chat-bubble-text strong { font-weight: 600; }
+
+  .chat-bubble.assistant.error {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: var(--red-dim);
+    color: var(--red);
+  }
+
+  .streaming-cursor::after {
+    content: '\25CF';
+    animation: cursorBlink 0.8s step-end infinite;
+    color: var(--accent);
+    margin-left: 2px;
+  }
+
+  @keyframes cursorBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .chat-input-area {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    align-items: flex-end;
+  }
+
+  .chat-input-area textarea {
+    flex: 1;
+    min-height: 40px;
+    max-height: 120px;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    overflow-y: auto;
+  }
+
+  .chat-input-area textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .chat-input-area textarea::placeholder { color: var(--text-3); }
+
+  .chat-send {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.12s, opacity 0.12s;
+  }
+
+  .chat-send:hover { background: var(--accent-hover); }
+  .chat-send:disabled { opacity: 0.35; cursor: default; }
 </style>
 </head>
 <body>
@@ -1389,6 +1517,9 @@
   <symbol id="icon-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
   </symbol>
+  <symbol id="icon-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+  </symbol>
 </svg>
 
 <header>
@@ -1399,6 +1530,7 @@
       <button class="tab" id="tab-search" data-tab="search">Search</button>
       <button class="tab" id="tab-library" data-tab="library">Library</button>
       <button class="tab" id="tab-downloads" data-tab="downloads">Downloads</button>
+      <button class="tab" id="tab-chat" data-tab="chat">Chat</button>
       <div class="tab-indicator" id="tab-indicator"></div>
     </div>
   </div>
@@ -1461,6 +1593,22 @@
       <svg class="empty-icon"><use href="#icon-download"/></svg>
       <p>No active downloads</p>
       <p class="empty-sub">Search for a movie to start downloading</p>
+    </div>
+  </section>
+
+  <section id="view-chat" class="view">
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-bubble assistant">
+          <div class="chat-bubble-text">Hey! I know your movie library and what you've watched. Ask me for recommendations, comparisons, or what to watch tonight.</div>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <textarea id="chat-input" rows="1" placeholder="Ask about movies..."></textarea>
+        <button class="chat-send" id="chat-send" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
     </div>
   </section>
 </main>
@@ -1620,6 +1768,8 @@ function switchTab(tab) {
     fetchExplore();
   } else if (tab === 'search') {
     document.getElementById('search-input').focus();
+  } else if (tab === 'chat') {
+    document.getElementById('chat-input').focus();
   }
 }
 
@@ -2987,13 +3137,153 @@ async function plexSync(btn) {
     var res = await fetch('/api/plex/sync-watched', { method: 'POST' });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sync failed');
-    showToast('Synced ' + data.synced + ' new watched (' + data.total_watched + ' total in Plex)', 'success');
+    var msg = 'Synced ' + data.synced + ' new watched (' + data.total_watched + ' total in Plex)';
+    if (data.radarr_added) msg += ', added ' + data.radarr_added + ' to Radarr';
+    showToast(msg, 'success');
     fetchLibrary();
   } catch (err) {
     showToast(err.message || 'Plex sync failed', 'error');
   }
   setBtnDone(btn, orig);
 }
+
+/* ===== Chat ===== */
+let chatMessages = [];
+let chatStreaming = false;
+
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+function appendChatBubble(role, text) {
+  var container = document.getElementById('chat-messages');
+  var bubble = document.createElement('div');
+  bubble.className = 'chat-bubble ' + role;
+  var textEl = document.createElement('div');
+  textEl.className = 'chat-bubble-text';
+  textEl.textContent = text;
+  bubble.appendChild(textEl);
+  container.appendChild(bubble);
+  scrollChatToBottom();
+  return textEl;
+}
+
+function scrollChatToBottom() {
+  var container = document.getElementById('chat-messages');
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendChat() {
+  var input = document.getElementById('chat-input');
+  var sendBtn = document.getElementById('chat-send');
+  var text = input.value.trim();
+  if (!text || chatStreaming) return;
+
+  chatStreaming = true;
+  sendBtn.disabled = true;
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Add user message
+  chatMessages.push({ role: 'user', content: text });
+  appendChatBubble('user', text);
+
+  // Create assistant bubble with streaming cursor
+  var assistantText = appendChatBubble('assistant', '');
+  assistantText.classList.add('streaming-cursor');
+
+  var fullResponse = '';
+
+  try {
+    var res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatMessages })
+    });
+
+    if (!res.ok) {
+      var err = await res.json();
+      throw new Error(err.error || 'Chat request failed');
+    }
+
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+
+      buffer += decoder.decode(result.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line in buffer
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line.startsWith('data: ')) continue;
+        var data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          var event = JSON.parse(data);
+          if (event.type === 'message_stop') {
+            reader.cancel();
+            break;
+          }
+          if (event.type === 'content_block_delta' && event.delta && event.delta.type === 'text_delta') {
+            fullResponse += event.delta.text;
+            assistantText.textContent = fullResponse;
+            scrollChatToBottom();
+          }
+        } catch (e) {
+          // skip unparseable lines
+        }
+      }
+    }
+
+  } catch (err) {
+    if (!fullResponse) {
+      assistantText.textContent = 'Error: ' + err.message;
+      assistantText.parentElement.classList.add('error');
+    }
+  } finally {
+    assistantText.classList.remove('streaming-cursor');
+    // Render markdown on completed assistant response
+    if (fullResponse.trim()) {
+      assistantText.replaceChildren(document.createRange().createContextualFragment(renderMarkdown(fullResponse)));
+      chatMessages.push({ role: 'assistant', content: fullResponse });
+    }
+    chatStreaming = false;
+    sendBtn.disabled = !document.getElementById('chat-input').value.trim();
+  }
+}
+
+// Chat event listeners
+(function() {
+  var input = document.getElementById('chat-input');
+  var sendBtn = document.getElementById('chat-send');
+
+  input.addEventListener('input', function() {
+    // Auto-resize
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    // Enable/disable send
+    sendBtn.disabled = !this.value.trim() || chatStreaming;
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+
+  sendBtn.addEventListener('click', sendChat);
+})();
 
 /* ===== Toast ===== */
 var toastTimeout = null;

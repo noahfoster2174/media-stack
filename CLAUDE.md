@@ -104,10 +104,21 @@ The proxy server (`server.py`) sits between the browser and the Radarr/qBittorre
 - Auto-refreshing download progress
 - Remove torrents from qBittorrent
 - Auto-starts Docker services and Mullvad VPN on launch
+- AI chat powered by Anthropic Claude API (SSE streaming)
+- Chat knows movie library and watch history via system prompt
+- Markdown rendering in chat responses
+
+### Chat
+
+- Streams responses from Anthropic Messages API via SSE relay in server.py
+- Connection: close header ensures clean stream termination
+- Client detects `message_stop` event as belt-and-suspenders stream close
+- Chat history lives in JS memory (not persisted across reloads)
 
 ### Credentials
 
 All secrets read from `.env` (gitignored):
+- `ANTHROPIC_API_KEY` — Anthropic API key (for chat)
 - `RADARR_API_KEY` — Radarr API key
 - `QBT_USER` / `QBT_PASS` — qBittorrent login
 - `MULLVAD_ACCOUNT` — Mullvad account number (for VPN)
