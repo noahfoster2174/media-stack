@@ -35,10 +35,10 @@ _env = load_env()
 
 PORT = 9999
 RADARR_URL = "http://localhost:7878"
-RADARR_API_KEY = _env.get("RADARR_API_KEY", "REDACTED_API_KEY")
+RADARR_API_KEY = _env["RADARR_API_KEY"]
 QBT_URL = "http://localhost:8080"
 QBT_USER = _env.get("QBT_USER", "admin")
-QBT_PASS = _env.get("QBT_PASS", "REDACTED_PASSWORD")
+QBT_PASS = _env.get("QBT_PASS", "")
 COMPOSE_DIR = ENV_FILE.parent
 NOTION_TOKEN = _env.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = _env.get("NOTION_DATABASE_ID", "")
