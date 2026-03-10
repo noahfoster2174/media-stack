@@ -123,6 +123,24 @@ All secrets read from `.env` (gitignored):
 - `QBT_USER` / `QBT_PASS` — qBittorrent login
 - `MULLVAD_ACCOUNT` — Mullvad account number (for VPN)
 
+### Troubleshooting
+
+If the app loads but Explore/Search/Downloads fail silently while Chat still works → Docker Desktop is probably not running. Radarr (7878) and qBittorrent (8080) are down, but TMDB and Anthropic APIs work independently.
+
+**Fix:** `open -a Docker && cd ~/media-stack && docker compose up -d` or just run `./launch-app.sh`.
+
+**Verify:**
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:7878/api/v3/health  # 200 or 401 = OK
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v2/app/version  # 200 = OK
+```
+
+### Known improvements (backlog)
+
+1. **Add timeouts to `urlopen` in server.py** — proxy requests to Radarr/qBittorrent have no timeout; hangs if service is partially up
+2. **Use `fetchWithTimeout` consistently in index.html** — currently only used by Search; Explore and health check use raw `fetch()`
+3. **Make health banner more prominent** — currently a small dismissible bar; could be a full-screen overlay when core services are down
+
 ### Launch methods
 
 | Method | How |
