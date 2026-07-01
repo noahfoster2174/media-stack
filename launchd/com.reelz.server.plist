@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.reelz.server</string>
+    <!-- Template: setup.sh replaces __HOME__ and __PYTHON__ and installs this to
+         ~/Library/LaunchAgents. Keeps the Reelz server + supervisor running from login
+         (KeepAlive restarts on crash). PATH is explicit so the supervisor's shell-outs
+         (docker / mullvad / ollama / open) resolve headlessly. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>__HOME__/media-stack/app/server.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__HOME__/media-stack/app</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/reelz.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/reelz.log</string>
+</dict>
+</plist>

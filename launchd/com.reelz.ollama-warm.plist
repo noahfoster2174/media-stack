@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.reelz.ollama-warm</string>
+    <!-- Preload + pin the chat model at login so the first chat is instant.
+         keep_alive:-1 keeps it resident until Ollama restarts. Retries ~60s while
+         the Ollama service comes up after login. Portable as-is (no host paths). -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>for i in $(seq 1 30); do if /usr/bin/curl -s --max-time 3 -X POST http://localhost:11434/api/generate -d '{"model":"llama3.2:3b","keep_alive":-1}' >/dev/null 2>&amp;1; then exit 0; fi; sleep 2; done</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/dev/null</string>
+    <key>StandardErrorPath</key>
+    <string>/dev/null</string>
+</dict>
+</plist>

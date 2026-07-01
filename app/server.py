@@ -7,14 +7,24 @@ import json
 import os
 import random
 import re
+import socket
 import sqlite3
 import subprocess
+import sys
+import threading
 import concurrent.futures
 import urllib.request
 import urllib.parse
 import urllib.error
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import supervisor  # local module: dependency health/heal engine
+
+# Default network timeout for every socket-based call (urllib inherits this) so a dead
+# upstream can never hang a worker thread forever. Calls that need longer (chat streaming)
+# pass an explicit timeout that overrides this per-socket.
+socket.setdefaulttimeout(30)
 
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
@@ -34,6 +44,9 @@ def load_env():
 _env = load_env()
 
 PORT = 9999
+# Opt-in LAN binding (for reaching Reelz from a phone on home WiFi). Default: localhost only.
+# Note: with Mullvad's full tunnel up, LAN access also needs `mullvad lan set allow`.
+BIND_HOST = "0.0.0.0" if _env.get("BIND_LAN", "").strip().lower() in ("1", "true", "yes") else "127.0.0.1"
 RADARR_URL = "http://localhost:7878"
 RADARR_API_KEY = _env["RADARR_API_KEY"]
 QBT_URL = "http://localhost:8080"
@@ -48,13 +61,37 @@ PLEX_URL = _env.get("PLEX_URL", "http://localhost:32400")
 PLEX_TOKEN = _env.get("PLEX_TOKEN", "")
 ANTHROPIC_API_KEY = _env.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
+# Chat runs on a local Ollama model (OpenAI-compatible API) — no API credits, no cloud.
+OLLAMA_URL = _env.get("OLLAMA_URL", "http://localhost:11434/v1").rstrip("/")
+OLLAMA_MODEL = _env.get("OLLAMA_MODEL", "llama3.2:3b")  # blank = auto-pick first non-embedding model
 MOVIES_DIR = Path.home() / "Downloads" / "Movies"
 DB_PATH = Path(__file__).resolve().parent / "data.db"
 
 qbt_sid = None
+qbt_lock = threading.Lock()  # ThreadingHTTPServer runs handlers concurrently; guard qbt_sid
 
 
 # ---- SQLite ----
+
+def query_db(sql, params=()):
+    """Run a SELECT and return all rows; always closes the connection."""
+    conn = get_db()
+    try:
+        return conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+
+
+def exec_db(sql, params=()):
+    """Run a write, commit, return the cursor's rowcount; always closes the connection."""
+    conn = get_db()
+    try:
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
 
 def init_db():
     conn = sqlite3.connect(str(DB_PATH))
@@ -135,19 +172,27 @@ def ensure_services():
     return results
 
 
-def qbt_login():
-    """Authenticate with qBittorrent, store SID cookie."""
+def qbt_login(force=False):
+    """Authenticate with qBittorrent and store the SID cookie. Thread-safe.
+
+    Under ThreadingHTTPServer two requests can race here; the lock + double-check means
+    only one login happens and neither thread clobbers the other's SID. Pass force=True
+    to re-login when an existing SID has gone stale (403).
+    """
     global qbt_sid
-    data = urllib.parse.urlencode({"username": QBT_USER, "password": QBT_PASS}).encode()
-    try:
-        resp = urllib.request.urlopen(urllib.request.Request(f"{QBT_URL}/api/v2/auth/login", data=data))
-        for key, val in resp.getheaders():
-            if key.lower() == "set-cookie" and "SID=" in val:
-                qbt_sid = val.split("SID=")[1].split(";")[0]
-                return True
-    except Exception:
-        pass
-    return False
+    with qbt_lock:
+        if qbt_sid and not force:
+            return True  # another thread already logged in while we waited
+        data = urllib.parse.urlencode({"username": QBT_USER, "password": QBT_PASS}).encode()
+        try:
+            resp = urllib.request.urlopen(urllib.request.Request(f"{QBT_URL}/api/v2/auth/login", data=data))
+            for key, val in resp.getheaders():
+                if key.lower() == "set-cookie" and "SID=" in val:
+                    qbt_sid = val.split("SID=")[1].split(";")[0]
+                    return True
+        except Exception:
+            pass
+        return False
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -155,6 +200,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/", ""):
             self._serve_index()
+        elif self.path == "/api/health":
+            self._relay(200, json.dumps(supervisor.get_state()).encode(), "application/json")
         elif self.path == "/api/watched":
             self._get_watched()
         elif self.path == "/api/tmdb/recommendations":
@@ -173,6 +220,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/ensure-services":
             self._ensure_services()
+        elif self.path == "/api/heal":
+            self._heal()
         elif self.path == "/api/watched":
             self._post_watched()
         elif self.path == "/api/notion/review":
@@ -209,6 +258,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _heal(self):
+        """Trigger the supervisor's recovery for one service (from the UI/menubar Fix action)."""
+        n = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(n)) if n else {}
+        name = body.get("service", "")
+        if not name:
+            return self._json_error(400, "service required")
+        self._relay(200, json.dumps(supervisor.heal(name)).encode(), "application/json")
+
     def _serve_index(self):
         p = Path(__file__).parent / "index.html"
         if not p.exists():
@@ -236,14 +294,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             self._relay(e.code, e.read(), "application/json")
         except urllib.error.URLError:
-            self.send_error(502, "Radarr unreachable — is Docker running?")
+            self._json_error(502, "Radarr unreachable — is Docker running?")
 
     def _proxy_qbt(self):
-        global qbt_sid
         api_path = self.path[len("/api/qbt/"):]
         url = f"{QBT_URL}/api/v2/{api_path}"
         if not qbt_sid and not qbt_login():
-            return self.send_error(502, "qBittorrent auth failed")
+            return self._json_error(502, "qBittorrent auth failed")
         for attempt in range(2):
             try:
                 req = urllib.request.Request(url)
@@ -251,24 +308,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 resp = urllib.request.urlopen(req)
                 return self._relay(200, resp.read(), resp.getheader("Content-Type", "application/json"))
             except urllib.error.HTTPError as e:
+                if e.code == 403 and attempt == 0 and qbt_login(force=True):
+                    continue
                 if e.code == 403 and attempt == 0:
-                    qbt_sid = None
-                    if qbt_login():
-                        continue
-                    return self.send_error(502, "qBittorrent re-auth failed")
+                    return self._json_error(502, "qBittorrent re-auth failed")
                 return self._relay(e.code, e.read(), "application/json")
             except urllib.error.URLError:
-                return self.send_error(502, "qBittorrent unreachable — is Docker running?")
+                return self._json_error(502, "qBittorrent unreachable — is Docker running?")
 
     def _proxy_qbt_post(self):
         """Proxy POST to qBittorrent (e.g. torrents/delete)."""
-        global qbt_sid
         api_path = self.path[len("/api/qbt/"):]
         url = f"{QBT_URL}/api/v2/{api_path}"
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n) if n else None
         if not qbt_sid and not qbt_login():
-            return self.send_error(502, "qBittorrent auth failed")
+            return self._json_error(502, "qBittorrent auth failed")
         for attempt in range(2):
             try:
                 req = urllib.request.Request(url, data=body, method="POST")
@@ -278,23 +333,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 resp = urllib.request.urlopen(req)
                 return self._relay(200, resp.read(), resp.getheader("Content-Type", "text/plain"))
             except urllib.error.HTTPError as e:
+                if e.code == 403 and attempt == 0 and qbt_login(force=True):
+                    continue
                 if e.code == 403 and attempt == 0:
-                    qbt_sid = None
-                    if qbt_login():
-                        continue
-                    return self.send_error(502, "qBittorrent re-auth failed")
+                    return self._json_error(502, "qBittorrent re-auth failed")
                 return self._relay(e.code, e.read(), "text/plain")
             except urllib.error.URLError:
-                return self.send_error(502, "qBittorrent unreachable")
+                return self._json_error(502, "qBittorrent unreachable")
 
     # ---- Watched CRUD ----
 
     def _get_watched(self):
-        conn = get_db()
-        rows = conn.execute("SELECT * FROM watched ORDER BY watched_at DESC").fetchall()
-        conn.close()
-        data = json.dumps([dict(r) for r in rows]).encode()
-        self._relay(200, data, "application/json")
+        rows = query_db("SELECT * FROM watched ORDER BY watched_at DESC")
+        self._relay(200, json.dumps([dict(r) for r in rows]).encode(), "application/json")
 
     def _post_watched(self):
         n = int(self.headers.get("Content-Length", 0))
@@ -302,9 +353,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         tmdb_id = body.get("tmdb_id")
         title = body.get("title", "")
         if not tmdb_id or not title:
-            return self._relay(400, json.dumps({"error": "tmdb_id and title required"}).encode(), "application/json")
-        conn = get_db()
-        conn.execute("""
+            return self._json_error(400, "tmdb_id and title required")
+        exec_db("""
             INSERT INTO watched (tmdb_id, title, year, rating, review_text, poster_url)
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(tmdb_id) DO UPDATE SET
@@ -313,18 +363,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 watched_at = datetime('now'),
                 poster_url = excluded.poster_url
         """, (tmdb_id, title, body.get("year"), body.get("rating"), body.get("review_text", ""), body.get("poster_url", "")))
-        conn.commit()
-        row = conn.execute("SELECT * FROM watched WHERE tmdb_id = ?", (tmdb_id,)).fetchone()
-        conn.close()
+        row = query_db("SELECT * FROM watched WHERE tmdb_id = ?", (tmdb_id,))[0]
         self._relay(200, json.dumps(dict(row)).encode(), "application/json")
 
     def _delete_watched(self):
         watched_id = self.path.split("/")[-1]
-        conn = get_db()
-        conn.execute("DELETE FROM watched WHERE id = ?", (watched_id,))
-        conn.commit()
-        conn.close()
-        self._relay(200, json.dumps({"ok": True}).encode(), "application/json")
+        if not watched_id.isdigit():
+            return self._json_error(400, "invalid watched id")
+        deleted = exec_db("DELETE FROM watched WHERE id = ?", (int(watched_id),))
+        self._relay(200, json.dumps({"ok": True, "deleted": deleted}).encode(), "application/json")
 
     # ---- Notion push ----
 
@@ -385,7 +432,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             self._relay(e.code, e.read(), "application/json")
         except urllib.error.URLError:
-            self.send_error(502, "TMDB unreachable")
+            self._json_error(502, "TMDB unreachable")
 
     # ---- TMDB recommendations & provider discovery ----
 
@@ -455,7 +502,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             self._relay(e.code, e.read(), "application/json")
         except urllib.error.URLError:
-            self.send_error(502, "TMDB unreachable")
+            self._json_error(502, "TMDB unreachable")
 
     # ---- Bulk Import ----
 
@@ -581,13 +628,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 {"error": "PLEX_TOKEN not configured in .env"}
             ).encode(), "application/json")
 
-        # Fetch all movies with GUIDs
+        # Fetch all movies with GUIDs (token in header, not URL, so it can't leak to logs)
         try:
-            url = (
-                f"{PLEX_URL}/library/sections/1/all"
-                f"?X-Plex-Token={PLEX_TOKEN}&includeGuids=1"
-            )
-            req = urllib.request.Request(url)
+            url = f"{PLEX_URL}/library/sections/1/all?includeGuids=1"
+            req = urllib.request.Request(url, headers={"X-Plex-Token": PLEX_TOKEN})
             resp = urllib.request.urlopen(req)
             xml_data = resp.read()
         except Exception as e:
@@ -712,11 +756,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 {"error": "PLEX_TOKEN not configured in .env"}
             ).encode(), "application/json")
         try:
-            url = (
-                f"{PLEX_URL}/library/sections/1/refresh"
-                f"?X-Plex-Token={PLEX_TOKEN}"
-            )
-            req = urllib.request.Request(url)
+            url = f"{PLEX_URL}/library/sections/1/refresh"
+            req = urllib.request.Request(url, headers={"X-Plex-Token": PLEX_TOKEN})
             urllib.request.urlopen(req)
             self._relay(200, json.dumps({"ok": True}).encode(), "application/json")
         except urllib.error.HTTPError as e:
@@ -779,15 +820,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         return "\n".join(lines)
 
-    def _chat(self):
-        """Stream Claude chat responses via SSE."""
-        if not ANTHROPIC_API_KEY:
-            return self._relay(
-                400,
-                json.dumps({"error": "Add ANTHROPIC_API_KEY to .env"}).encode(),
-                "application/json",
-            )
+    def _ollama_model(self):
+        """Resolve the chat model: configured name, else first non-embedding model."""
+        if OLLAMA_MODEL:
+            return OLLAMA_MODEL
+        try:
+            resp = urllib.request.urlopen(f"{OLLAMA_URL}/models", timeout=5)
+            for m in json.loads(resp.read()).get("data", []):
+                mid = m.get("id", "")
+                if mid and "embed" not in mid.lower():
+                    return mid
+        except Exception:
+            pass
+        return None
 
+    def _chat(self):
+        """Stream chat responses from a local Ollama model (no API credits, no cloud).
+
+        Ollama's OpenAI-compatible endpoint speaks the OpenAI streaming format; we translate
+        each chunk into the Anthropic-style SSE events the frontend already parses
+        (content_block_delta / text_delta, then message_stop), so index.html needs no changes.
+        """
         n = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(n)) if n else {}
         messages = body.get("messages", [])
@@ -795,53 +848,72 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not isinstance(messages, list) or not messages:
             return self._relay(400, json.dumps({"error": "messages array required"}).encode(), "application/json")
 
-        system_prompt = self._build_chat_context()
+        model = self._ollama_model()
+        if not model:
+            return self._relay(400, json.dumps({
+                "error": "No local chat model available. Run `ollama pull llama3.2:3b` and make sure "
+                         "the Ollama service is running (`brew services start ollama`)."
+            }).encode(), "application/json")
+
+        # OpenAI format: system prompt is a message, not a top-level field.
+        oai_messages = [{"role": "system", "content": self._build_chat_context()}] + messages
 
         api_body = json.dumps({
-            "model": ANTHROPIC_MODEL,
+            "model": model,
+            "messages": oai_messages,
             "max_tokens": 1024,
-            "system": system_prompt,
-            "messages": messages,
+            "temperature": 0.7,
             "stream": True,
         }).encode()
 
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
+            f"{OLLAMA_URL}/chat/completions",
             data=api_body,
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
             method="POST",
         )
 
         try:
-            resp = urllib.request.urlopen(req, timeout=60)
+            resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
-            err_body = e.read()
-            return self._relay(e.code, err_body, "application/json")
+            return self._relay(e.code, e.read(), "application/json")
         except urllib.error.URLError as e:
             return self._relay(
                 502,
-                json.dumps({"error": f"Anthropic API unreachable: {e}"}).encode(),
+                json.dumps({"error": f"Ollama unreachable at {OLLAMA_URL} — is the service running? ({e})"}).encode(),
                 "application/json",
             )
 
-        # Stream SSE to client
+        # Stream: OpenAI SSE in -> Anthropic-style SSE out
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
         self.end_headers()
 
+        def emit(obj):
+            self.wfile.write(f"data: {json.dumps(obj)}\n\n".encode())
+            self.wfile.flush()
+
         try:
-            while True:
-                line = resp.readline()
-                if not line:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                payload = line[len("data:"):].strip()
+                if payload == "[DONE]":
                     break
-                self.wfile.write(line)
-                self.wfile.flush()
+                try:
+                    choices = json.loads(payload).get("choices", [])
+                except json.JSONDecodeError:
+                    print(f"chat: skipped non-JSON SSE payload: {payload[:120]!r}", file=sys.stderr)
+                    continue
+                if not choices:
+                    continue
+                text = choices[0].get("delta", {}).get("content")
+                if text:
+                    emit({"type": "content_block_delta", "delta": {"type": "text_delta", "text": text}})
+            emit({"type": "message_stop"})
         except BrokenPipeError:
             pass
         finally:
@@ -854,6 +926,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _json_error(self, status, message):
+        """Relay an error as JSON so the frontend can always parse it (vs send_error's HTML)."""
+        self._relay(status, json.dumps({"error": message}).encode(), "application/json")
+
     def log_message(self, fmt, *args):
         # Only log errors, not every 200
         if args and str(args[1]).startswith("2"):
@@ -862,8 +938,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Reelz server running at http://localhost:{PORT}")
+    supervisor.start()  # background probe/heal loop feeds /api/health
+    srv = http.server.ThreadingHTTPServer((BIND_HOST, PORT), Handler)
+    print(f"Reelz server running at http://{BIND_HOST}:{PORT}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

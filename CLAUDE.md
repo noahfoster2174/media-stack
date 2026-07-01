@@ -104,28 +104,89 @@ The proxy server (`server.py`) sits between the browser and the Radarr/qBittorre
 - Auto-refreshing download progress
 - Remove torrents from qBittorrent
 - Auto-starts Docker services and Mullvad VPN on launch
-- AI chat powered by Anthropic Claude API (SSE streaming)
+- AI chat powered by a local Ollama model (no API costs, no cloud, runs on-device)
 - Chat knows movie library and watch history via system prompt
 - Markdown rendering in chat responses
 
 ### Chat
 
-- Streams responses from Anthropic Messages API via SSE relay in server.py
-- Connection: close header ensures clean stream termination
-- Client detects `message_stop` event as belt-and-suspenders stream close
-- Chat history lives in JS memory (not persisted across reloads)
+Chat runs against a **local Ollama** model over its OpenAI-compatible API — no Anthropic
+API key or credits needed (the Max plan does not fund the developer API).
+
+- `server.py` calls Ollama at `OLLAMA_URL` (default `http://localhost:11434/v1`) and
+  translates its OpenAI-style stream into the Anthropic-style SSE events the frontend
+  already parses (`content_block_delta`/`text_delta`, then `message_stop`), so
+  `index.html` is unchanged.
+- Model pinned via `OLLAMA_MODEL` in `.env` (currently `llama3.2:3b`). If blank,
+  server.py auto-picks the first non-embedding model from `/v1/models`.
+- **Always-warm:** the OpenAI `/v1/chat/completions` endpoint can't pass `keep_alive`, so each chat
+  resets the model to Ollama's 5-min default and it would unload. Rather than fight Ollama's
+  brew-managed plist (brew regenerates it), the **supervisor keeps it warm**: `keep_model_warm()`
+  re-pins `keep_alive=-1` every ~4 min, and `_heal_ollama()` restarts the Ollama server if it's fully
+  down. The `com.reelz.ollama-warm` LaunchAgent also preloads the model at login so the first chat
+  after a reboot is instant. Verify with `ollama ps` (a loaded model = warm).
+- Connection: close header ensures clean stream termination.
+- Chat history lives in JS memory (not persisted across reloads).
+
+**Prerequisites for Chat:** Ollama running as a service (`brew services start ollama`)
+with the model pulled (`ollama pull llama3.2:3b`). If neither, Chat returns a clear
+error; the rest of the app is unaffected.
 
 ### Credentials
 
 All secrets read from `.env` (gitignored):
-- `ANTHROPIC_API_KEY` — Anthropic API key (for chat)
+- `OLLAMA_URL` / `OLLAMA_MODEL` — local Ollama endpoint + model (for chat)
 - `RADARR_API_KEY` — Radarr API key
 - `QBT_USER` / `QBT_PASS` — qBittorrent login
 - `MULLVAD_ACCOUNT` — Mullvad account number (for VPN)
+- `ANTHROPIC_API_KEY` — legacy/unused (chat moved to local Ollama)
+
+## Self-healing supervisor
+
+`app/supervisor.py` is the brain that makes Reelz a hands-off daily driver. A background
+thread probes every dependency (~5s) and **auto-heals** what's down, with a 45s cooldown so
+it recovers transient failures without thrashing.
+
+- **State:** each service is `up | starting | down`; overall is `up | degraded | down`
+  (a *critical* service down → `down`; critical = Docker, qBittorrent, Radarr).
+- **API:** `GET /api/health` (cached state), `POST /api/heal {service}` (manual fix).
+- **Heals:** Docker off → `open -a Docker` + `compose up`; container unhealthy → `compose
+  restart`; Mullvad down → `mullvad connect`; Ollama → warm/pin the model.
+- **UI:** header **status pill** (green/amber/red) polling `/api/health`, a click-panel with
+  per-service **Fix** buttons, and a **preflight overlay** that holds the app until core is
+  green — so it never opens broken and never dead-ends on a 502.
+- **Notifications:** the loop watches qBittorrent; a newly-finished download fires a macOS
+  notification ("🍿 … is ready to watch"). `_new_completions()` is the pure, unit-tested core.
+
+### Always-on (start at login)
+
+- **`~/Library/LaunchAgents/com.reelz.server.plist`** — runs `server.py` with `KeepAlive`
+  (restarts on crash) + `RunAtLoad` (starts at login). PATH is set explicitly so the
+  supervisor's `docker`/`mullvad`/`ollama` shell-outs resolve headlessly. Logs to
+  `~/Library/Logs/reelz.log`. Restart it with
+  `launchctl kickstart -k gui/$(id -u)/com.reelz.server`.
+- **`com.reelz.ollama-warm.plist`** — preloads the chat model at login.
+- **`start-stack.sh`** — idempotent "ensure server reachable" (used by `launch-app.sh`, which
+  now just calls it then opens Chrome). Reachability (curl :9999), not PID files, is the truth.
+
+### Menubar (SwiftBar)
+
+`swiftbar/reelz.5s.sh` renders `/api/health` as a 🎬 + colored dot in the menubar with a
+per-service menu and Fix actions (`swiftbar/reelz-heal.sh`). SwiftBar's plugin dir is set via
+`defaults write com.ameba.SwiftBar PluginDirectory ~/media-stack/swiftbar`.
+
+### Phone access (opt-in)
+
+Set `BIND_LAN=1` in `.env` and restart the server → it binds `0.0.0.0` (default is localhost).
+Reach it at `http://<mac-lan-ip>:9999` from a phone on the same WiFi; the UI is responsive
+(<640px). If Mullvad's full tunnel is up, LAN access also needs `mullvad lan set allow`.
+No auth — home LAN only (a shared token is a possible later add).
 
 ### Troubleshooting
 
-If the app loads but Explore/Search/Downloads fail silently while Chat still works → Docker Desktop is probably not running. Radarr (7878) and qBittorrent (8080) are down, but TMDB and Anthropic APIs work independently.
+If the app loads but Explore/Search/Downloads fail silently while Chat still works → Docker Desktop is probably not running. Radarr (7878) and qBittorrent (8080) are down, but TMDB works independently.
+
+If Chat fails while everything else works → Ollama isn't serving. Run `brew services start ollama` and `ollama pull llama3.2:3b` (verify with `curl -s localhost:11434/v1/models`; check the loaded model with `ollama ps`).
 
 **Fix:** `open -a Docker && cd ~/media-stack && docker compose up -d` or just run `./launch-app.sh`.
 
