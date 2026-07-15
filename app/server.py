@@ -124,16 +124,12 @@ def ensure_services():
     """Start Docker, Mullvad, and docker compose if not already running."""
     results = {}
 
-    # 1. Mullvad VPN
+    # 1. Mullvad VPN — report only; never auto-connect (user runs it on demand before downloading).
     try:
         status = subprocess.run(
             ["mullvad", "status"], capture_output=True, text=True, timeout=5
         )
-        if "Connected" not in status.stdout:
-            subprocess.run(["mullvad", "connect"], timeout=10)
-            results["mullvad"] = "connecting"
-        else:
-            results["mullvad"] = "already connected"
+        results["mullvad"] = "connected" if "Connected" in status.stdout else "disconnected"
     except Exception as e:
         results["mullvad"] = f"error: {e}"
 
@@ -274,6 +270,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         data = p.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        # Never cache the app shell — it's a single rapidly-updated file served locally, so a stale
+        # cached copy (e.g. in a long-open Chrome --app window) would silently run old code.
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)

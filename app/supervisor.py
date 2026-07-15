@@ -206,13 +206,16 @@ def keep_model_warm():
 # ---- registry ----
 
 class Service:
-    def __init__(self, name, label, probe, heal=None, critical=False, hint=""):
+    def __init__(self, name, label, probe, heal=None, critical=False, hint="",
+                 auto_heal=True, count_in_overall=True):
         self.name = name
         self.label = label
         self.probe = probe
         self.heal = heal
-        self.critical = critical      # critical → blocks the app's "ready" gate
-        self.hint = hint              # shown when down
+        self.critical = critical            # critical → blocks the app's "ready" gate
+        self.hint = hint                    # shown when down
+        self.auto_heal = auto_heal          # False → only heals on manual request (the Fix button)
+        self.count_in_overall = count_in_overall  # False → its state doesn't affect the overall pill
 
 
 SERVICES = [
@@ -230,8 +233,11 @@ SERVICES = [
     Service("sonarr", "Sonarr", lambda: _http_up("http://localhost:8989/ping"),
             _heal_restart("sonarr"),
             hint="TV service is down."),
+    # User-controlled: never auto-connected (user turns it on only when downloading), and its
+    # off-state doesn't drag the overall status. Still shown + connectable via the Fix button.
     Service("mullvad", "Mullvad VPN", _probe_mullvad, _heal_mullvad,
-            hint="VPN disconnected — downloads route through it."),
+            hint="VPN off — connect it before downloading (torrents route through it).",
+            auto_heal=False, count_in_overall=False),
     Service("ollama", "Chat model", lambda: _http_up("http://localhost:11434/api/tags"),
             _heal_ollama,
             hint="Local chat backend is down."),
@@ -263,6 +269,7 @@ def _snapshot_service(svc):
         "status": status,
         "critical": svc.critical,
         "can_heal": svc.heal is not None,
+        "count_in_overall": svc.count_in_overall,
         "hint": "" if up else svc.hint,
     }
 
@@ -272,7 +279,7 @@ def check_all(heal=False):
     results = []
     for svc in SERVICES:
         r = _snapshot_service(svc)
-        if heal and r["status"] == "down" and svc.heal:
+        if heal and r["status"] == "down" and svc.heal and svc.auto_heal:
             if time.time() - _last_heal.get(svc.name, 0) >= HEAL_COOLDOWN_S:
                 _last_heal[svc.name] = time.time()
                 try:
@@ -282,9 +289,10 @@ def check_all(heal=False):
                 r = _snapshot_service(svc)   # re-probe (likely "starting" now)
         results.append(r)
 
-    if any(r["status"] != "up" and r["critical"] for r in results):
+    considered = [r for r in results if r.get("count_in_overall", True)]
+    if any(r["status"] != "up" and r["critical"] for r in considered):
         overall = "down"
-    elif any(r["status"] != "up" for r in results):
+    elif any(r["status"] != "up" for r in considered):
         overall = "degraded"
     else:
         overall = "up"
