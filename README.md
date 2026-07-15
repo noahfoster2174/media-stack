@@ -28,7 +28,7 @@ Plex runs separately (not containerized).
 ```bash
 cp .env.example .env          # then fill in the blanks (Mullvad account, API keys…)
 make up                       # start the *arr stack (docker compose up -d)
-ollama pull llama3.2:3b       # one-time: pull the local chat model
+ollama pull qwen2.5:3b       # one-time: pull the local chat model
 make app                      # launch the Reelz web app (Chrome app window)
 make health                   # verify everything is answering
 ```

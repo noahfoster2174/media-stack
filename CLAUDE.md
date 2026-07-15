@@ -117,7 +117,7 @@ API key or credits needed (the Max plan does not fund the developer API).
   translates its OpenAI-style stream into the Anthropic-style SSE events the frontend
   already parses (`content_block_delta`/`text_delta`, then `message_stop`), so
   `index.html` is unchanged.
-- Model pinned via `OLLAMA_MODEL` in `.env` (currently `llama3.2:3b`). If blank,
+- Model pinned via `OLLAMA_MODEL` in `.env` (currently `qwen2.5:3b`). If blank,
   server.py auto-picks the first non-embedding model from `/v1/models`.
 - **Always-warm:** the OpenAI `/v1/chat/completions` endpoint can't pass `keep_alive`, so each chat
   resets the model to Ollama's 5-min default and it would unload. Rather than fight Ollama's
@@ -129,7 +129,7 @@ API key or credits needed (the Max plan does not fund the developer API).
 - Chat history lives in JS memory (not persisted across reloads).
 
 **Prerequisites for Chat:** Ollama running as a service (`brew services start ollama`)
-with the model pulled (`ollama pull llama3.2:3b`). If neither, Chat returns a clear
+with the model pulled (`ollama pull qwen2.5:3b`). If neither, Chat returns a clear
 error; the rest of the app is unaffected.
 
 ### Credentials
@@ -186,7 +186,7 @@ No auth — home LAN only (a shared token is a possible later add).
 
 If the app loads but Explore/Search/Downloads fail silently while Chat still works → Docker Desktop is probably not running. Radarr (7878) and qBittorrent (8080) are down, but TMDB works independently.
 
-If Chat fails while everything else works → Ollama isn't serving. Run `brew services start ollama` and `ollama pull llama3.2:3b` (verify with `curl -s localhost:11434/v1/models`; check the loaded model with `ollama ps`).
+If Chat fails while everything else works → Ollama isn't serving. Run `brew services start ollama` and `ollama pull qwen2.5:3b` (verify with `curl -s localhost:11434/v1/models`; check the loaded model with `ollama ps`).
 
 **Fix:** `open -a Docker && cd ~/media-stack && docker compose up -d` or just run `./launch-app.sh`.
 

@@ -771,10 +771,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _build_chat_context(self):
         """Build system prompt with Radarr library and watched history."""
         lines = [
-            "You are a helpful movie recommendation assistant for the Reelz app.",
+            "You are a movie recommendation assistant for the Reelz app.",
             "You have access to the user's movie library and watch history.",
             "Use this context to give personalized recommendations.",
-            "Be concise and conversational.",
+            "Keep replies SHORT — 2-4 sentences by default. Recommend a few specific titles by name;",
+            "don't write long plot summaries, numbered lists, or essays unless the user explicitly asks",
+            "for more detail. Be conversational and get to the point.",
+            "When the user wants something recent or new, use the 'Trending / In theaters' list below —",
+            "it's live data, so trust it over your own training, which may be out of date on new releases.",
             "",
             "## User's Downloaded Library",
         ]
@@ -817,7 +821,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception:
             lines.append("(unavailable)")
 
+        lines.append("")
+        lines.append("## Trending / In theaters now (live from TMDB)")
+        recent = self._tmdb_recent_titles()
+        if recent:
+            for t in recent:
+                lines.append(f"- {t}")
+        else:
+            lines.append("(unavailable)")
+
         return "\n".join(lines)
+
+    def _tmdb_recent_titles(self, limit=20):
+        """Live trending + now-playing titles from TMDB, so the model can recommend recent
+        releases despite its training cutoff. Best-effort — returns [] if TMDB is unreachable."""
+        if not TMDB_API_KEY:
+            return []
+        titles, seen = [], set()
+        for path in ("/trending/movie/week", "/movie/now_playing"):
+            try:
+                url = f"{TMDB_BASE}{path}?api_key={TMDB_API_KEY}&region=US"
+                data = json.loads(urllib.request.urlopen(url, timeout=5).read())
+                for m in data.get("results", [])[:12]:
+                    title = m.get("title") or m.get("name")
+                    year = (m.get("release_date") or "")[:4]
+                    key = (title, year)
+                    if title and key not in seen:
+                        seen.add(key)
+                        titles.append(f"{title} ({year})" if year else title)
+            except Exception:
+                continue
+        return titles[:limit]
 
     def _ollama_model(self):
         """Resolve the chat model: configured name, else first non-embedding model."""
@@ -860,7 +894,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         api_body = json.dumps({
             "model": model,
             "messages": oai_messages,
-            "max_tokens": 1024,
+            "max_tokens": 500,
             "temperature": 0.7,
             "stream": True,
         }).encode()

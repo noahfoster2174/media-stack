@@ -25,8 +25,8 @@ else
 fi
 
 if command -v ollama >/dev/null 2>&1; then
-    say "Chat model (llama3.2:3b)"
-    ollama pull llama3.2:3b
+    say "Chat model (qwen2.5:3b)"
+    ollama pull qwen2.5:3b
     brew services start ollama >/dev/null 2>&1   # ensure the server runs; supervisor keeps the model warm
     echo "  ✓ model pulled; Ollama running (supervisor re-pins keep_alive so it stays warm)"
 fi

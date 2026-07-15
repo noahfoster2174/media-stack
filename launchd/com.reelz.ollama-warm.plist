@@ -11,7 +11,7 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>for i in $(seq 1 30); do if /usr/bin/curl -s --max-time 3 -X POST http://localhost:11434/api/generate -d '{"model":"llama3.2:3b","keep_alive":-1}' >/dev/null 2>&amp;1; then exit 0; fi; sleep 2; done</string>
+        <string>for i in $(seq 1 30); do if /usr/bin/curl -s --max-time 3 -X POST http://localhost:11434/api/generate -d '{"model":"qwen2.5:3b","keep_alive":-1}' >/dev/null 2>&amp;1; then exit 0; fi; sleep 2; done</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
